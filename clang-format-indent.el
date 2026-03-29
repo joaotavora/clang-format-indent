@@ -1,5 +1,11 @@
 ;;; clang-format-indent.el --- c++-ts-mode indent style driven by .clang-format -*- lexical-binding: t; -*-
 
+;; Author: João Távora <joaotavora@gmail.com>
+;; Version: 0.1.0
+;; Package-Requires: ((emacs "29.1"))
+;; Keywords: c languages tree-sitter
+;; URL: https://github.com/joaotavora/clang-format-indent
+
 (require 'c-ts-mode)
 
 ;;; --------------------------------------------------------------------
