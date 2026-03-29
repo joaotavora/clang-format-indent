@@ -1,0 +1,1 @@
+preproc_arg is opaque: tree-sitter does not parse macro bodies, so Align-mode continuation args cannot be aligned to the opening paren.
