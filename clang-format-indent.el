@@ -6,22 +6,33 @@
 ;; Keywords: c languages tree-sitter
 ;; URL: https://github.com/joaotavora/clang-format-indent
 
+(require 'cl-lib)
 (require 'c-ts-mode)
 
 ;;; --------------------------------------------------------------------
 ;;; Config reader
 ;;; --------------------------------------------------------------------
 
-(defun cfi--parse-config ()
+(defun cfi--warn (fmt &rest args)
+  (apply #'message (concat "clang-format-indent: " fmt) args))
+
+(cl-defun cfi--parse-config ()
   "Run `clang-format --dump-config' in the current buffer's directory.
-Return an alist of (KEY . VALUE) strings for top-level scalar fields."
+Return an alist of (KEY . VALUE) strings for top-level scalar fields,
+or nil if clang-format is unavailable or its invocation fails."
+  (unless (executable-find "clang-format")
+    (cfi--warn "clang-format not found, using defaults")
+    (cl-return-from cfi--parse-config nil))
   (let ((dir (or (and buffer-file-name
                       (file-name-directory buffer-file-name))
                  default-directory))
         result)
     (with-temp-buffer
-      (let ((default-directory dir))
-        (call-process "clang-format" nil t nil "--dump-config"))
+      (let* ((default-directory dir)
+             (exit-code (call-process "clang-format" nil t nil "--dump-config")))
+        (unless (zerop exit-code)
+          (cfi--warn "clang-format --dump-config failed (exit %d), using defaults" exit-code)
+          (cl-return-from cfi--parse-config nil)))
       (goto-char (point-min))
       ;; Only match non-indented lines (top-level YAML scalars).
       ;; Indented lines belong to nested blocks like BraceWrapping and are ignored.
