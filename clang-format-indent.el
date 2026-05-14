@@ -212,9 +212,14 @@ translates settings that directly affect indentation into
        ;; indent-width which is correct.  For all other styles (Allman, Microsoft,
        ;; Mozilla, WebKit – IndentBraces: false) the '{' sits at the same column
        ;; as its controlling statement, so we need standalone-parent 0.
-       ;; Harmless for Attach-brace styles (Google/LLVM) where '{' is never at BOL.
+       ;; Exception: a bare block scope { } inside a function/compound body has
+       ;; its parent as another compound_statement; indent it one level in from
+       ;; the enclosing block rather than aligning it to the controlling statement.
        ,@(unless indent-braces
-           `(((node-is "compound_statement") standalone-parent 0)))
+           `(((and (node-is "compound_statement")
+                   (parent-is "compound_statement"))
+              standalone-parent ,indent-width)
+             ((node-is "compound_statement") standalone-parent 0)))
 
        ;; --- binary expression continuation ---
        ;; Right-hand operand of a wrapped binary expression (||, &&, +, …)
