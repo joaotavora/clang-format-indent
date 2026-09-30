@@ -57,6 +57,23 @@ or nil if clang-format is unavailable or its invocation fails."
   (let ((v (cfi--get cfg key nil)))
     (if v (equal v "true") default)))
 
+(defun cfi--simple-indent-rules (mode style)
+  "Return `treesit-simple-indent-rules' for MODE in STYLE.
+
+`c-ts-mode--simple-indent-rules' used to take (MODE STYLE) and purely
+return the rules.  Newer Emacsen changed it to take just MODE and
+consult `c-ts-mode-indent-style' for the style, so probe its arity and
+call it accordingly.  The `apply' keeps either byte-compiler happy
+about the arity."
+  ;; The binding is a no-op on the old protocol, which takes STYLE as arg.
+  (let ((c-ts-mode-indent-style style))
+    (apply #'c-ts-mode--simple-indent-rules
+           (if (> (car (func-arity #'c-ts-mode--simple-indent-rules)) 1)
+               ;; Old protocol: pure function of (MODE STYLE).
+               (list mode style)
+             ;; New protocol: style comes from `c-ts-mode-indent-style'.
+             (list mode)))))
+
 ;;;###autoload
 (defun clang-format-indent-style ()
   "Indent C++ from the .clang-format visible to the current buffer.
@@ -90,7 +107,7 @@ translates settings that directly affect indentation into
          ;; (not indented one level further as K&R baseline would give).
          (indent-braces (equal brace-style "GNU"))
          (access-col    (+ indent-width access-offset))
-         (k&r-rules     (cdr (assq 'cpp (c-ts-mode--simple-indent-rules 'cpp 'k&r)))))
+         (k&r-rules     (cdr (assq 'cpp (cfi--simple-indent-rules 'cpp 'k&r)))))
 
     ;; Keep c-ts-indent-offset in sync; K&R rules reference it by symbol.
     (setq c-ts-indent-offset indent-width)
@@ -396,6 +413,23 @@ translates settings that directly affect indentation into
 
        ;; --- remaining K&R rules ---
        ,@k&r-rules))))
+
+(defun cfi--install-indent-rules ()
+  "Re-install `treesit-simple-indent-rules' when our style is active.
+
+Needed on Emacsen whose `c-ts-mode--simple-indent-rules' discards the
+rules returned by a function-valued `c-ts-mode-indent-style' after
+funcalling them."
+  (when (and (derived-mode-p 'c-ts-mode 'c++-ts-mode)
+             (eq c-ts-mode-indent-style #'clang-format-indent-style))
+    (setq-local treesit-simple-indent-rules (clang-format-indent-style))))
+
+;; The mode hook runs after the mode's own setup, so it wins over the
+;; broken write above.  Old-protocol Emacsen set the variable correctly
+;; from the funcall result, so they don't need this.
+(when (= (car (func-arity #'c-ts-mode--simple-indent-rules)) 1)
+  (add-hook 'c++-ts-mode-hook #'cfi--install-indent-rules)
+  (add-hook 'c-ts-mode-hook #'cfi--install-indent-rules))
 
 (provide 'clang-format-indent)
 
